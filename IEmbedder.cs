@@ -1,11 +1,13 @@
 namespace EmbeddingsApi2
 {
     using System.Threading.Tasks;
+    
     /// <summary>
     /// Defines a contract for embedding generation functionality.
     /// </summary>
     public interface IEmbedder
     {
+        
         /// <summary>
         /// Asynchronously generates embeddings for the specified text.
         /// </summary>

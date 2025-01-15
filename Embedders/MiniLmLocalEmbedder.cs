@@ -19,6 +19,7 @@ namespace EmbeddingsApi2.Embedders
         #endregion
         
         #region Constructors-and-Factories
+        
         /// <summary>
         /// Initializes a new instance of the <see cref="MiniLmLocalEmbedder"/> class.
         /// </summary>
@@ -29,9 +30,11 @@ namespace EmbeddingsApi2.Embedders
             _session = new InferenceSession(modelPath);
             _vocabulary = LoadVocabulary(vocabularyPath);
         }
+        
         #endregion
         
         #region Public-Methods
+        
         /// <summary>
         /// Asynchronously generates embeddings for the provided text.
         /// </summary>
@@ -68,9 +71,11 @@ namespace EmbeddingsApi2.Embedders
 
             return embeddings;
         }
+        
         #endregion
         
         #region Private-Methods
+        
         /// <summary>
         /// Loads the vocabulary from the specified file path.
         /// </summary>
@@ -87,6 +92,7 @@ namespace EmbeddingsApi2.Embedders
 
             return vocabulary;
         }
+        
         /// <summary>
         /// Tokenizes the input text into token IDs and attention masks.
         /// </summary>
@@ -139,6 +145,7 @@ namespace EmbeddingsApi2.Embedders
                 attentionMask.Take(actualLength).ToList()
             );
         }
+        
         /// <summary>
         /// Tokenizes a single word into subword token IDs.
         /// </summary>
