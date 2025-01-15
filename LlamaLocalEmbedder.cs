@@ -3,7 +3,7 @@ using LLama;
 namespace EmbeddingsApi2;
 using LLama;
 
-public class LlamaLocalEmbedder : IEmbedder
+class LlamaLocalEmbedder : IEmbedder
 {
     private readonly LLamaEmbedder _embedder;
 
@@ -14,8 +14,7 @@ public class LlamaLocalEmbedder : IEmbedder
 
     public async Task<float[]> GetEmbeddingsAsync(string text)
     {
-        // LLamaEmbedder doesn't have an async method,
-        // but we can wrap it in Task.Run if needed
-        return await Task.Run(() => _embedder.GetEmbeddings(text));
+        var embeddings = await _embedder.GetEmbeddings(text);
+        return embeddings;
     }
 }

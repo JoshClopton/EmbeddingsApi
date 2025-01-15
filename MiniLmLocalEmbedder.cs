@@ -1,26 +1,138 @@
 using Microsoft.ML.OnnxRuntime;
+using Microsoft.ML.OnnxRuntime.Tensors;
 
 namespace EmbeddingsApi2;
-
-public class MiniLmLocalEmbedder : IEmbedder
+class MiniLmLocalEmbedder : IEmbedder
 {
     private readonly InferenceSession _session;
+    private readonly Dictionary<string, int> _vocabulary;
+    private const int MaxLength = 256;
 
-    public MiniLmLocalEmbedder(string onnxFilePath)
+    public MiniLmLocalEmbedder(string modelPath, string vocabularyPath)
     {
-        // Load the ONNX session
-        _session = new InferenceSession(onnxFilePath);
-        // Possibly load a tokenizer or vocab
+        _session = new InferenceSession(modelPath);
+        _vocabulary = LoadVocabulary(vocabularyPath);
     }
 
     public async Task<float[]> GetEmbeddingsAsync(string text)
     {
-        // 1) Tokenize `text` to input_ids, attention_mask, etc.
-        //    e.g. using a custom BERT tokenizer in C# or Dotnet-Transformers
-        // 2) Create OnnxRuntime NamedOnnxValue
-        // 3) session.Run(...)
-        // 4) Process output to produce float[] embedding
-        // For demonstration, we return a fake vector
-        return await Task.FromResult(new float[] { 0.1f, 0.2f, 0.3f });
+        // Tokenize the input text
+        var (tokenIds, attentionMask) = Tokenize(text);
+
+        // Create token_type_ids (all zeros, same length as input_ids)
+        var tokenTypeIds = new long[tokenIds.Count];
+        Array.Fill(tokenTypeIds, 0L);
+
+        // Create input tensors
+        var inputTensor = new DenseTensor<long>(tokenIds.ToArray(), new[] { 1, tokenIds.Count });
+        var maskTensor = new DenseTensor<long>(attentionMask.ToArray(), new[] { 1, attentionMask.Count });
+        var tokenTypeTensor = new DenseTensor<long>(tokenTypeIds, new[] { 1, tokenTypeIds.Length });
+
+        var inputs = new List<NamedOnnxValue>
+        {
+            NamedOnnxValue.CreateFromTensor("input_ids", inputTensor),
+            NamedOnnxValue.CreateFromTensor("attention_mask", maskTensor),
+            NamedOnnxValue.CreateFromTensor("token_type_ids", tokenTypeTensor)
+        };
+
+        // Run inference
+        using var results = _session.Run(inputs);
+
+        // Extract embeddings from the model output
+        // Note: The exact output tensor name might vary, you might need to check the model's output names
+        var embeddings = results.First().AsTensor<float>().ToArray();
+        
+        return embeddings;
+    }
+
+    private Dictionary<string, int> LoadVocabulary(string path)
+    {
+        var vocabulary = new Dictionary<string, int>();
+        var lines = File.ReadAllLines(path);
+        for (int i = 0; i < lines.Length; i++)
+        {
+            vocabulary[lines[i].Trim()] = i;
+        }
+        return vocabulary;
+    }
+
+    private (List<long> TokenIds, List<long> AttentionMask) Tokenize(string text)
+    {
+        // Initialize with special tokens
+        var tokenIds = new List<long> { _vocabulary["[CLS]"] };
+        var attentionMask = new List<long> { 1 };
+
+        // Basic tokenization
+        var words = text.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        foreach (var word in words)
+        {
+            // If the word exists in vocabulary, add it
+            if (_vocabulary.TryGetValue(word.ToLower(), out int tokenId))
+            {
+                tokenIds.Add(tokenId);
+                attentionMask.Add(1);
+            }
+            else
+            {
+                // WordPiece tokenization for unknown words
+                var subwords = TokenizeWord(word);
+                tokenIds.AddRange(subwords);
+                attentionMask.AddRange(Enumerable.Repeat(1L, subwords.Count));
+            }
+
+            // Check if we're approaching max length (leaving room for [SEP])
+            if (tokenIds.Count >= MaxLength - 1)
+                break;
+        }
+
+        // Add [SEP] token
+        tokenIds.Add(_vocabulary["[SEP]"]);
+        attentionMask.Add(1);
+
+        // Pad if necessary (but keep actual length if shorter than MaxLength)
+        int actualLength = tokenIds.Count;
+        while (tokenIds.Count < MaxLength)
+        {
+            tokenIds.Add(_vocabulary["[PAD]"]);
+            attentionMask.Add(0);
+        }
+
+        // Trim to actual used length
+        return (
+            tokenIds.Take(actualLength).ToList(),
+            attentionMask.Take(actualLength).ToList()
+        );
+    }
+
+    private List<long> TokenizeWord(string word)
+    {
+        var tokens = new List<long>();
+        var currentToken = "";
+
+        foreach (char c in word.ToLower())
+        {
+            currentToken += c;
+            string prefix = currentToken;
+            
+            // Try with "##" prefix for subwords
+            if (tokens.Count > 0)
+            {
+                prefix = "##" + currentToken;
+            }
+
+            if (_vocabulary.TryGetValue(prefix, out int tokenId))
+            {
+                tokens.Add(tokenId);
+                currentToken = "";
+            }
+        }
+
+        // If we couldn't tokenize the word, use UNK token
+        if (tokens.Count == 0 || currentToken.Length > 0)
+        {
+            tokens.Add(_vocabulary["[UNK]"]);
+        }
+
+        return tokens;
     }
 }
