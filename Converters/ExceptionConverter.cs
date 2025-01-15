@@ -1,4 +1,4 @@
-namespace EmbeddingsApi2
+namespace EmbeddingsApi2.Converters
 {
     using System;
     using System.Linq;

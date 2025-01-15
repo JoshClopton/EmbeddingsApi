@@ -1,5 +1,3 @@
-using Microsoft.ML.OnnxRuntime;
-using Microsoft.ML.OnnxRuntime.Tensors;
 using EmbeddingsApi2;
 using EmbeddingsApi2.EmbeddingModels;
 
