@@ -1,6 +1,6 @@
 using System.ComponentModel;
 
-namespace EmbeddingsApi2
+namespace EmbeddingsApi2.Converters
 
 {
     using System;

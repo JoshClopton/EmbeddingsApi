@@ -9,6 +9,7 @@ namespace EmbeddingsApi2
     using System.Threading.Tasks;
     using RestWrapper;
     using SyslogLogging;
+    using EmbeddingsApi2.Converters;
 
     /// <summary>
     /// HuggingFace client.

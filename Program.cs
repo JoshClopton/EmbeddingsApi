@@ -1,5 +1,8 @@
 using EmbeddingsApi2;
 using EmbeddingsApi2.EmbeddingModels;
+using EmbeddingsApi2.Converters;
+using EmbeddingsApi2.Embedders;
+
 
 // LLamaSharp for GGUF models
 using LLama;
