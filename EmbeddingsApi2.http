@@ -1,0 +1,6 @@
+@EmbeddingsApi2_HostAddress = http://localhost:5093
+
+GET {{EmbeddingsApi2_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
