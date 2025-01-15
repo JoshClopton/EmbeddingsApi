@@ -1,176 +1,3 @@
-// using Microsoft.AspNetCore.Builder;
-// using Microsoft.AspNetCore.Hosting;
-// using Microsoft.Extensions.Hosting;
-// using Microsoft.AspNetCore.Http;
-// using System.Text.Json;
-// using System.Text.Json.Serialization;
-// using System.Threading;
-// using System.Threading.Tasks;
-// using EmbeddingsApi2;
-// using Microsoft.ML.OnnxRuntime;
-// using Microsoft.ML.OnnxRuntime.Tensors;
-//
-// // LLamaSharp
-// using LLama;
-// using LLama.Common;
-//
-// // OnnxRuntime (needed if you go the ONNX route for MiniLM)
-// using Microsoft.ML.OnnxRuntime;
-//
-// // If you have a reference to your HuggingFaceClient, SyslogLogging, etc:
-// var builder = WebApplication.CreateBuilder(args);
-//
-// var app = builder.Build();
-//
-// // 1) GET /health – to check if it is running
-// app.MapGet("/health", () => 
-// {
-//     return Results.Ok("Service is running!");
-// });
-//
-// app.MapPost("/preload", async (PreloadRequest req) =>
-// {
-//     // Logging + serializer for your HuggingFaceClient
-//     var logging = new SyslogLogging.LoggingModule();
-//     var serializer = new Serializer();
-//
-//     var huggingFaceClient = new HuggingFaceClient(logging, serializer, req.ApiKey ?? "");
-//
-//     // Step A: If requested, download the model from Hugging Face
-//     //         (e.g., for LLaMA .gguf or an ONNX file for MiniLM).
-//     try
-//     {
-//         if (!string.IsNullOrEmpty(req.ModelId))
-//         {
-//             Console.WriteLine($"[preload] Downloading model files for '{req.ModelId}'...");
-//
-//             // If it's LLaMA-based .gguf
-//             if (req.ModelFormat?.Equals("gguf", StringComparison.OrdinalIgnoreCase) == true)
-//             {
-//                 // We'll call HuggingFaceClient.DownloadGguf
-//                 bool success = await huggingFaceClient.DownloadGguf(
-//                     req.ModelId,
-//                     req.SourceFilename!,   // e.g. "mymodel.gguf"
-//                     req.OutputFilename!,   // e.g. "mymodel.gguf"
-//                     CancellationToken.None
-//                 );
-//
-//                 if (!success)
-//                 {
-//                     Console.WriteLine($"[preload] Failed to download '{req.SourceFilename}'.");
-//                     return Results.BadRequest("Failed to download model file.");
-//                 }
-//                 Console.WriteLine($"[preload] Downloaded '{req.SourceFilename}' to '{req.OutputFilename}'.");
-//             }
-//             else
-//             {
-//                 // Maybe we have a non-LLaMA model that we want as an ONNX file
-//                 // If you already have a local ONNX, you might skip downloading.
-//                 // Or you have some custom approach: e.g. "DownloadOnnx(...)"
-//                 // For demonstration, let's just assume you have it locally
-//                 Console.WriteLine("[preload] Skipping direct download (ONNX or other).");
-//             }
-//         }
-//     }
-//     catch (Exception ex)
-//     {
-//         Console.WriteLine($"[preload] Error downloading model: {ex.Message}");
-//         return Results.BadRequest($"Error: {ex.Message}");
-//     }
-//
-//     // Step B: Load the model into memory for embeddings
-//     try
-//     {
-//         IEmbedder embedder;
-//         if (req.ModelFormat?.Equals("gguf", StringComparison.OrdinalIgnoreCase) == true)
-//         {
-//             // (1) LLaMA-based approach with LLamaSharp
-//             Console.WriteLine("[preload] Loading GGUF model with LLamaSharp...");
-//             var mParams = new ModelParams(req.OutputFilename!)
-//             {
-//                 EmbeddingMode = true
-//             };
-//
-//             var weights = LLamaWeights.LoadFromFile(mParams);
-//             embedder = new LlamaLocalEmbedder(new LLamaEmbedder(weights, mParams));
-//         }
-//         else
-//         {
-//             // (2) MiniLM (or any other) approach using ONNX (skeleton code)
-//             Console.WriteLine("[preload] Loading ONNX-based model for MiniLM or similar...");
-//             // e.g. "all-minilm-l6-v2.onnx" previously downloaded
-//
-//             // This is a placeholder for local inference:
-//             // Actual usage requires tokenization + session:
-//             var miniLmEmbedder = new MiniLmLocalEmbedder("my-minilm-l6-v2.onnx");
-//             embedder = miniLmEmbedder;
-//         }
-//
-//         // Store in ModelCache
-//         ModelCache.Embedder = embedder;
-//         Console.WriteLine("[preload] Model is preloaded successfully.");
-//
-//         return Results.Ok("Model preloaded successfully!");
-//     }
-//     catch (Exception ex)
-//     {
-//         Console.WriteLine($"[preload] Error while loading model: {ex.Message}");
-//         return Results.BadRequest($"Error loading model: {ex.Message}");
-//     }
-// });
-//
-// // 3) POST /embeddings – to generate embeddings
-// //    Expects a JSON body with { "Texts": ["some text", "another text"] }
-// app.MapPost("/embeddings", async (EmbeddingRequest req) =>
-// {
-//     if (!ModelCache.IsModelLoaded)
-//     {
-//         return Results.BadRequest("Model is not loaded. Call /preload first.");
-//     }
-//
-//     try
-//     {
-//         var embedder = ModelCache.Embedder!; // non-null because IsModelLoaded is true
-//
-//         // We'll generate embeddings for each text in the request
-//         var embeddingsList = new List<float[]>();
-//
-//         foreach (var text in req.Texts)
-//         {
-//             float[] emb = await embedder.GetEmbeddingsAsync(text);
-//             embeddingsList.Add(emb);
-//         }
-//         return Results.Ok(new EmbeddingResponse(embeddingsList));
-//     }
-//     catch (Exception ex)
-//     {
-//         Console.WriteLine($"[embeddings] Error while getting embeddings: {ex.Message}");
-//         return Results.BadRequest($"Error while generating embeddings: {ex.Message}");
-//     }
-// });
-//
-// // Run the app
-// app.Run();
-//
-// // For demonstration, you can define them in the same file or as separate classes.
-// record EmbeddingRequest(List<string> Texts);
-// record EmbeddingResponse(List<float[]> Embeddings);
-//
-// // A static class to hold the embedder once loaded
-// static class ModelCache
-// {
-//     public static IEmbedder? Embedder { get; set; }
-//     public static bool IsModelLoaded => Embedder != null;
-// }
-//
-// // Minimal API Program
-//
-//
-// // 2) POST /preload – to download and load the model
-// //    This example uses your HuggingFaceClient logic from your snippet.
-//
-
-
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Hosting;
@@ -197,47 +24,48 @@ var app = builder.Build();
 // 1) GET /health – Check if the service is running
 app.MapGet("/health", () => Results.Ok("Service is running!"));
 
-// 2) POST /preload – Load either a GGUF or ONNX model
 app.MapPost("/preload", async (PreloadRequest req) =>
 {
     try
     {
         Console.WriteLine($"[preload] Received request to load model: {req.ModelId}");
 
-        // Step 1: Load the appropriate model type
-        IEmbedder embedder;
+        // Initialize HuggingFaceClient (needed for both GGUF and ONNX)
+        var logging = new SyslogLogging.LoggingModule();
+        var serializer = new Serializer();
+        var huggingFaceClient = new HuggingFaceClient(logging, serializer, req.ApiKey ?? "");
+
+        // Step 1: Download the appropriate model if needed
+        string localModelPath = Path.Combine(Directory.GetCurrentDirectory(), req.OutputFilename ?? "model.bin");
+        
         if (req.ModelFormat?.Equals("gguf", StringComparison.OrdinalIgnoreCase) == true)
         {
-            // GGUF (LLaMA-based models)
-            Console.WriteLine("[preload] Loading GGUF model with LLamaSharp...");
-            var mParams = new ModelParams(req.OutputFilename!)
+            if (!File.Exists(localModelPath))
             {
-                EmbeddingMode = true
-            };
-            var weights = LLamaWeights.LoadFromFile(mParams);
-            embedder = new LlamaLocalEmbedder(new LLamaEmbedder(weights, mParams));
+                Console.WriteLine("[preload] Downloading GGUF model file...");
+                bool success = await huggingFaceClient.DownloadGguf(
+                    req.ModelId!,
+                    req.SourceFilename ?? "model.gguf",  // Make sure to pass SourceFilename in request
+                    localModelPath,
+                    CancellationToken.None
+                );
+
+                if (!success)
+                {
+                    return Results.BadRequest("Failed to download GGUF model file.");
+                }
+            }
         }
         else if (req.ModelFormat?.Equals("onnx", StringComparison.OrdinalIgnoreCase) == true)
         {
-            // ONNX (MiniLM or similar)
-            Console.WriteLine("[preload] Loading ONNX model...");
-    
-            // Initialize HuggingFaceClient
-            var logging = new SyslogLogging.LoggingModule();
-            var serializer = new Serializer();
-            var huggingFaceClient = new HuggingFaceClient(logging, serializer, req.ApiKey ?? "");
-
-            // Download ONNX model file if needed
-            string onnxFilename = "model.onnx";  // The filename in the Hugging Face repo
-            string localOnnxPath = Path.Combine(Directory.GetCurrentDirectory(), req.OutputFilename ?? "model.onnx");
-    
-            if (!File.Exists(localOnnxPath))
+            // Existing ONNX download logic...
+            if (!File.Exists(localModelPath))
             {
                 Console.WriteLine("[preload] Downloading ONNX model file...");
                 bool success = await huggingFaceClient.DownloadOnnx(
-                    "onnx-models/all-MiniLM-L6-v2-onnx",
-                    onnxFilename,
-                    localOnnxPath,
+                    req.ModelId!,
+                    req.SourceFilename ?? "model.onnx",
+                    localModelPath,
                     CancellationToken.None
                 );
 
@@ -246,17 +74,35 @@ app.MapPost("/preload", async (PreloadRequest req) =>
                     return Results.BadRequest("Failed to download ONNX model file.");
                 }
             }
+        }
+        else
+        {
+            return Results.BadRequest("Invalid model format. Supported formats: gguf, onnx");
+        }
 
-            // Download vocabulary file if needed
-            string vocabFilename = "vocab.txt";
-            string localVocabPath = Path.Combine(Directory.GetCurrentDirectory(), vocabFilename);
-    
+        // Step 2: Load the model
+        IEmbedder embedder;
+        if (req.ModelFormat?.Equals("gguf", StringComparison.OrdinalIgnoreCase) == true)
+        {
+            Console.WriteLine("[preload] Loading GGUF model with LLamaSharp...");
+            var mParams = new ModelParams(localModelPath)
+            {
+                EmbeddingMode = true
+            };
+            var weights = LLamaWeights.LoadFromFile(mParams);
+            embedder = new LlamaLocalEmbedder(new LLamaEmbedder(weights, mParams));
+        }
+        else // ONNX
+        {
+            Console.WriteLine("[preload] Loading ONNX model...");
+            string localVocabPath = Path.Combine(Directory.GetCurrentDirectory(), "vocab.txt");
+            
             if (!File.Exists(localVocabPath))
             {
                 Console.WriteLine("[preload] Downloading vocabulary file...");
                 bool success = await huggingFaceClient.DownloadVocabulary(
-                    "onnx-models/all-MiniLM-L6-v2-onnx",
-                    vocabFilename,
+                    req.ModelId!,
+                    "vocab.txt",
                     localVocabPath,
                     CancellationToken.None
                 );
@@ -267,14 +113,10 @@ app.MapPost("/preload", async (PreloadRequest req) =>
                 }
             }
 
-            embedder = new MiniLmLocalEmbedder(localOnnxPath, localVocabPath);
-        }
-        else
-        {
-            return Results.BadRequest("Invalid model format. Supported formats: gguf, onnx.");
+            embedder = new MiniLmLocalEmbedder(localModelPath, localVocabPath);
         }
 
-        // Step 2: Store embedder in ModelCache
+        // Store embedder in ModelCache
         ModelCache.Embedder = embedder;
         Console.WriteLine("[preload] Model loaded successfully.");
 
@@ -319,10 +161,8 @@ app.MapPost("/embeddings", async (EmbeddingRequest req) =>
 app.Run();
 
 // Define helper classes and interfaces
-record PreloadRequest(string? ModelId, string? ModelFormat, string? OutputFilename, string? ApiKey);
 record EmbeddingRequest(List<string> Texts);
 record EmbeddingResponse(List<float[]> Embeddings);
-
 interface IEmbedder
 {
     Task<float[]> GetEmbeddingsAsync(string text);
